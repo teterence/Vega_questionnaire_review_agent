@@ -70,12 +70,6 @@ python -m pytest tests/ -v
                │ (only if all rules pass)
                ▼
 ┌─────────────────────────────────┐
-│  Input Sanitisation             │  Prompt injection patterns → Escalate
-│  (sanitiser.py)                 │  Protects LLM from adversarial input
-└──────────────┬──────────────────┘
-               │
-               ▼
-┌─────────────────────────────────┐
 │  LLM Text Analysis              │  Classifies free-text fields as:
 │  (llm_reviewer.py)              │    clear / ambiguous / red_flag
 │                                 │
@@ -92,7 +86,7 @@ python -m pytest tests/ -v
 └──────────────┬──────────────────┘
                │
                ▼
-           Output JSON + Audit Log (SQLite)
+  Output JSON + Audit Log (SQLite)
 ```
 
 ### Design Principles
@@ -103,7 +97,7 @@ python -m pytest tests/ -v
 
 3. **Minimal dependencies.** The agent has three production dependencies. The `openai` SDK for its Groq compatibility, `pydantic` for strict validation, and `python-dotenv` for configuration management.
 
-4. **Sanitisation before LLM.** Text supplied by the user flows directly into LLM prompts. The sanitiser detects prompt injection patterns and flags them before the text reaches the model.
+4. **Prompt hardening over sanitisation.** User-supplied text flows directly into LLM prompts. Rather than attempting to detect and block injections with regex rules, the prompt is structurally hardened: user content is wrapped in explicit trust-boundary delimiters, the model is instructed to treat input fields as untrusted data in any language, and an output anchor is placed as the last instruction before generation.
 
 ---
 
