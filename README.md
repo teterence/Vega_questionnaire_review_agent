@@ -17,8 +17,6 @@ An AI agent that reviews PE fund subscription questionnaires and decides whether
 # Clone the repo
 git clone https://github.com/YOUR_USERNAME/Vega_questionnaire_review_agent.git
 
-cd vega-questionnaire-agent
-
 # Install dependencies
 pip install -r requirements.txt
 
