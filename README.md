@@ -2,8 +2,6 @@
 
 An AI agent that reviews PE fund subscription questionnaires and decides whether to **Approve**, **Return to Subscriber**, or **Escalate to Human Review**.
 
-Built with a deterministic-first architecture: the rule engine handles ~60% of cases without any LLM call. The LLM is invoked only for free-text ambiguity analysis — minimising cost, latency, and non-determinism.
-
 ---
 
 ## Quick Start
@@ -25,8 +23,8 @@ cd vega-questionnaire-agent
 pip install -r requirements.txt
 
 # Configure API key
-cp .env.example .env
-# Edit .env and add your GROQ_API_KEY
+# Create a .env file and add your GROQ_API_KEY
+echo "GROQ_API_KEY=your_key_here" > .env
 ```
 
 ### Run the Agent
@@ -70,12 +68,6 @@ python -m pytest tests/ -v
                │ (only if all rules pass)
                ▼
 ┌─────────────────────────────────┐
-│  Input Sanitisation             │  Prompt injection patterns → Escalate
-│  (sanitiser.py)                 │  Protects LLM from adversarial input
-└──────────────┬──────────────────┘
-               │
-               ▼
-┌─────────────────────────────────┐
 │  LLM Text Analysis              │  Classifies free-text fields as:
 │  (llm_reviewer.py)              │    clear / ambiguous / red_flag
 │                                 │
@@ -92,7 +84,7 @@ python -m pytest tests/ -v
 └──────────────┬──────────────────┘
                │
                ▼
-           Output JSON + Audit Log (SQLite)
+  Output JSON + Audit Log (SQLite)
 ```
 
 ### Design Principles
@@ -103,7 +95,7 @@ python -m pytest tests/ -v
 
 3. **Minimal dependencies.** The agent has three production dependencies. The `openai` SDK for its Groq compatibility, `pydantic` for strict validation, and `python-dotenv` for configuration management.
 
-4. **Sanitisation before LLM.** Text supplied by the user flows directly into LLM prompts. The sanitiser detects prompt injection patterns and flags them before the text reaches the model.
+4. **Prompt hardening over sanitisation.** User-supplied text flows directly into LLM prompts. The system prompt instructs the model to treat input fields as untrusted data in any language and to ignore any directives found within them.
 
 ---
 
@@ -125,7 +117,6 @@ Missing fields are always resolved before content review because there's no poin
 Triggered by policy violations or ambiguity that requires human judgment:
 
 - **Rule-based:** `is_accredited_investor` is `false` (regulatory requirement, non-accredited investors in PE funds require special handling)
-- **Rule-based:** Prompt injection detected in free-text fields
 - **LLM-based:** `source_of_funds_description` is vague (e.g., "various sources", "TBD"), suspicious (references to illegal activity), or insufficiently specific
 - **LLM-based:** `accreditation_details` are ambiguous, contradictory, or unsubstantiated
 - **Fallback:** If the LLM call fails after retry, then escalate rather than risk approving
@@ -141,7 +132,6 @@ Only when ALL of the following are true:
 - `investment_amount` is positive
 - Source of funds classified as "clear" by LLM
 - Accreditation details classified as "clear" by LLM
-- No prompt injection detected
 
 ---
 
@@ -248,7 +238,6 @@ vega-questionnaire-agent/
 ├── src/
 │   ├── schemas.py             # Pydantic models — input, output, internal types
 │   ├── rules.py               # Deterministic rule engine
-│   ├── sanitiser.py           # Prompt injection detection
 │   ├── llm_reviewer.py        # LLM text analysis (Groq / Llama 3.3 70B)
 │   ├── prompt_builder.py      # System + user prompt assembly with feedback
 │   ├── decision_engine.py     # Merges rules + LLM into final decision
@@ -257,19 +246,18 @@ vega-questionnaire-agent/
 ├── prompts/
 │   └── reviewer_system.txt    # Externalised system prompt
 ├── data/
-│   └── sample_input.json      # 5 sample questionnaires from the brief
+│   ├── sample_input.json      # 5 sample questionnaires from the brief
+│   └── injection_test.json    # 8 prompt injection test cases
 ├── output/
 │   └── results.json           # Agent output (generated on run)
 ├── feedback_store/
 │   └── feedback.db            # SQLite database (generated on run)
 ├── tests/
 │   ├── test_rules.py          # Rule engine unit tests
-│   ├── test_sanitiser.py      # Sanitisation tests
 │   ├── test_schemas.py        # Validation and schema tests
 │   └── test_integration.py    # Full pipeline tests (mocked LLM)
 ├── pyproject.toml             # Project metadata and dependencies
 ├── requirements.txt           # Pip-compatible dependency list
-├── .env.example               # API key template
 ├── .gitignore
 └── README.md
 ```
@@ -288,18 +276,18 @@ vega-questionnaire-agent/
 
 - **LLM non-determinism:** Despite temperature 0, LLM outputs can vary slightly across API calls. The retry + fallback mechanism mitigates this but doesn't eliminate it.
 - **Correction volume:** The few-shot learning mechanism is most effective with 5-20 corrections. Beyond ~50, a retrieval or summarisation strategy would be needed to stay within context limits.
-- **Single-language support:** The system prompt and keyword detection are English-only. International PE funds would need localisation.
+- **Single-language support:** The system prompt is English-only. International PE funds would need localisation.
 - **No document verification:** The agent trusts the structured data as provided. It does not cross-reference against external databases (e.g., OFAC sanctions lists, SEC EDGAR filings). A production system would integrate these.
 
 ---
 
 ## Libraries and Tools
 
-| Dependency          | Purpose              | Justification                                                    |
-| ------------------- | -------------------- | ---------------------------------------------------------------- |
-| `openai`            | LLM API client       | Groq is OpenAI-compatible. One SDK, multiple providers.          |
-| `pydantic`          | Data validation      | Strict typing catches malformed input at parse time.             |
-| `python-dotenv`     | Config management    | Loads API key from `.env` without hardcoding secrets.            |
-| `sqlite3` (stdlib)  | Feedback persistence | Zero-dependency storage. Ships with Python.                      |
-| `argparse` (stdlib) | CLI interface        | No external dependency needed for simple subcommands.            |
-| `pytest` (dev only) | Testing              | 45 tests covering rules, sanitisation, schemas, and integration. |
+| Dependency          | Purpose              | Justification                                           |
+| ------------------- | -------------------- | ------------------------------------------------------- |
+| `openai`            | LLM API client       | Groq is OpenAI-compatible. One SDK, multiple providers. |
+| `pydantic`          | Data validation      | Strict typing catches malformed input at parse time.    |
+| `python-dotenv`     | Config management    | Loads API key from `.env` without hardcoding secrets.   |
+| `sqlite3` (stdlib)  | Feedback persistence | Zero-dependency storage. Ships with Python.             |
+| `argparse` (stdlib) | CLI interface        | No external dependency needed for simple subcommands.   |
+| `pytest` (dev only) | Testing              | 35 tests covering rules, schemas, and integration.      |

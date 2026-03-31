@@ -41,12 +41,12 @@ def review_questionnaire(
     """Process a single questionnaire and return the agent's decision.
 
     This is the main entry point for the agent pipeline:
-      Input → Rules → [Sanitise → LLM if needed] → Decision → Output
+      Input → Rules → [LLM if needed] → Decision → Output
     """
     # --- Stage 1: Deterministic rule checks ---
     rule_result = run_rules(q)
 
-    # If there are missing fields, return immediately so no LLM call isneeded
+    # If there are missing fields, return immediately so no LLM call is needed
     if rule_result.missing_fields:
         logger.info(
             "[%s] RETURN — missing fields: %s",
@@ -78,7 +78,7 @@ def review_questionnaire(
         feedback_store=feedback_store,
     )
 
-    # --- Stage 4: Merge LLM results into decision ---
+    # --- Stage 3: Merge LLM results into decision ---
     escalation_reasons: list[str] = []
 
     # Check source of funds
@@ -111,7 +111,7 @@ def review_questionnaire(
             escalation_reason=reason,
         )
 
-    # --- Stage 5: All checks passed ---
+    # --- Stage 4: All checks passed ---
     logger.info("[%s] APPROVE", q.questionnaire_id)
     return AgentOutput(
         questionnaire_id=q.questionnaire_id,
