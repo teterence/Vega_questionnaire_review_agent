@@ -17,7 +17,8 @@ Built with a deterministic-first architecture: the rule engine handles ~60% of c
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/vega-questionnaire-agent.git
+git clone https://github.com/YOUR_USERNAME/Vega_questionnaire_review_agent.git
+
 cd vega-questionnaire-agent
 
 # Install dependencies
@@ -50,9 +51,9 @@ python -m pytest tests/ -v
 ## Architecture
 
 ```
-Input JSON
-  │
-  ▼
+           Input JSON
+               │
+               ▼
 ┌─────────────────────────────────┐
 │  Pydantic Validation            │  Malformed records → Escalate
 │  (schemas.py)                   │  Type coercion (e.g. string → float)
@@ -64,8 +65,7 @@ Input JSON
 │  (rules.py)                     │  signature_present=false → Return
 │                                 │  tax_id_provided=false → Return
 │  100% deterministic             │  is_accredited=false → Escalate
-│  Zero LLM calls                 │  investment_amount ≤ 0 → Return
-│  Handles ~60% of cases          │
+│  No LLM calls                   │  investment_amount ≤ 0 → Return
 └──────────────┬──────────────────┘
                │ (only if all rules pass)
                ▼
@@ -81,7 +81,7 @@ Input JSON
 │                                 │
 │  Llama 3.3 70B via Groq         │  Temperature: 0 (deterministic)
 │  JSON mode enforced             │  Retries once, then → Escalate
-│  Called ONLY for free-text       │  Includes few-shot corrections
+│  Called ONLY for free-text      │  Includes few-shot corrections
 └──────────────┬──────────────────┘
                │
                ▼
@@ -97,13 +97,13 @@ Input JSON
 
 ### Design Principles
 
-1. **Rules first, LLM last.** Every deterministic check that can be done without an LLM, is. The LLM is expensive, slow, and non-deterministic — it should only handle what rules cannot: interpreting natural language.
+1. **Rules first, LLM last.** Every deterministic check that can be done without an LLM is done without one. LLMs are non-deterministic, so it is reserved for what rules cannot handle which is namely interpreting natural language.
 
-2. **Conservative by default.** The cost of a false escalation (a human reviews something unnecessarily) is trivially low. The cost of a false approval (regulatory exposure) is severe. The agent defaults to escalation on any uncertainty, including LLM failures.
+2. **Conservative by default.** The cost of a false escalation (a human reviews something unnecessarily) is trivially low as opposed to the cost of a false approval (regulatory exposure). So the agent defaults to escalation on any uncertainty, including LLM failures.
 
-3. **Minimal dependencies.** Three production dependencies: `openai` (Groq-compatible SDK), `pydantic` (strict validation), `python-dotenv` (config). No frameworks, no chains, no orchestrators. Every line of code is justified.
+3. **Minimal dependencies.** The agent has three production dependencies. The `openai` SDK for its Groq compatibility, `pydantic` for strict validation, and `python-dotenv` for configuration management.
 
-4. **Sanitisation before LLM.** User-supplied text flows directly into LLM prompts. The sanitiser detects prompt injection patterns and flags them as red flags before the text reaches the model.
+4. **Sanitisation before LLM.** Text supplied by the user flows directly into LLM prompts. The sanitiser detects prompt injection patterns and flags them before the text reaches the model.
 
 ---
 
@@ -113,22 +113,22 @@ Input JSON
 
 Triggered when required information is missing or invalid. These checks are purely deterministic:
 
-- Any of `investor_name`, `investor_address`, `investment_amount`, `is_accredited_investor`, `signature_present`, `tax_id_provided` is null or empty
-- `signature_present` is `false` (signature not completed)
-- `tax_id_provided` is `false` (no tax ID on file)
-- `investment_amount` is zero or negative
+- Any required field is null or empty (`investor_name`, `investor_address`, `investment_amount`, `is_accredited_investor`, `signature_present`, `tax_id_provided`)
+- `signature_present` is present but set to `false`
+- `tax_id_provided` is present but set to `false`
+- `investment_amount` is present but zero or negative
 
-Missing fields are always resolved before content review — there's no point analysing the source of funds if the form is incomplete.
+Missing fields are always resolved before content review because there's no point analysing the source of funds if the form is incomplete.
 
 ### Escalate to Human Review
 
 Triggered by policy violations or ambiguity that requires human judgment:
 
-- **Rule-based:** `is_accredited_investor` is `false` (regulatory requirement — non-accredited investors in PE funds require special handling)
+- **Rule-based:** `is_accredited_investor` is `false` (regulatory requirement, non-accredited investors in PE funds require special handling)
 - **Rule-based:** Prompt injection detected in free-text fields
 - **LLM-based:** `source_of_funds_description` is vague (e.g., "various sources", "TBD"), suspicious (references to illegal activity), or insufficiently specific
 - **LLM-based:** `accreditation_details` are ambiguous, contradictory, or unsubstantiated
-- **Fallback:** LLM call fails after retry — escalate rather than risk approving
+- **Fallback:** If the LLM call fails after retry, then escalate rather than risk approving
 
 ### Approve
 
@@ -295,11 +295,11 @@ vega-questionnaire-agent/
 
 ## Libraries and Tools
 
-| Dependency | Purpose | Justification |
-|---|---|---|
-| `openai` | LLM API client | Groq is OpenAI-compatible. One SDK, multiple providers. |
-| `pydantic` | Data validation | Strict typing catches malformed input at parse time. |
-| `python-dotenv` | Config management | Loads API key from `.env` without hardcoding secrets. |
-| `sqlite3` (stdlib) | Feedback persistence | Zero-dependency storage. Ships with Python. |
-| `argparse` (stdlib) | CLI interface | No external dependency needed for simple subcommands. |
-| `pytest` (dev only) | Testing | 45 tests covering rules, sanitisation, schemas, and integration. |
+| Dependency          | Purpose              | Justification                                                    |
+| ------------------- | -------------------- | ---------------------------------------------------------------- |
+| `openai`            | LLM API client       | Groq is OpenAI-compatible. One SDK, multiple providers.          |
+| `pydantic`          | Data validation      | Strict typing catches malformed input at parse time.             |
+| `python-dotenv`     | Config management    | Loads API key from `.env` without hardcoding secrets.            |
+| `sqlite3` (stdlib)  | Feedback persistence | Zero-dependency storage. Ships with Python.                      |
+| `argparse` (stdlib) | CLI interface        | No external dependency needed for simple subcommands.            |
+| `pytest` (dev only) | Testing              | 45 tests covering rules, sanitisation, schemas, and integration. |
