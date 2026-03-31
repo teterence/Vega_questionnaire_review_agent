@@ -23,7 +23,6 @@ import logging
 from .feedback import FeedbackStore
 from .llm_reviewer import analyse_text
 from .rules import run_rules
-from .sanitiser import sanitise_text
 from .schemas import (
     AgentOutput,
     Decision,
@@ -47,7 +46,7 @@ def review_questionnaire(
     # --- Stage 1: Deterministic rule checks ---
     rule_result = run_rules(q)
 
-    # If there are missing fields, return immediately — no LLM call needed
+    # If there are missing fields, return immediately so no LLM call isneeded
     if rule_result.missing_fields:
         logger.info(
             "[%s] RETURN — missing fields: %s",
@@ -72,14 +71,10 @@ def review_questionnaire(
             escalation_reason=reason,
         )
 
-    # --- Stage 2: Sanitise free-text fields ---
-    clean_source = sanitise_text(q.source_of_funds_description)
-    clean_accreditation = sanitise_text(q.accreditation_details)
-
-    # --- Stage 3: LLM analysis of free-text fields ---
+    # --- Stage 2: LLM analysis of free-text fields ---
     llm_result: LLMClassificationResult = analyse_text(
-        source_of_funds=clean_source,
-        accreditation_details=clean_accreditation,
+        source_of_funds=q.source_of_funds_description,
+        accreditation_details=q.accreditation_details,
         feedback_store=feedback_store,
     )
 

@@ -20,7 +20,6 @@ from openai import OpenAI
 
 from .feedback import FeedbackStore
 from .prompt_builder import build_system_prompt, build_user_prompt
-from .sanitiser import contains_injection
 from .schemas import LLMClassificationResult, TextClassification
 
 logger = logging.getLogger(__name__)
@@ -67,16 +66,6 @@ def analyse_text(
     Returns conservative defaults (ambiguous/red_flag) on any failure.
     The agent should never approve based on a failed LLM call.
     """
-    # Short-circuit: if either field contains injection attempts, red-flag immediately
-    if contains_injection(source_of_funds) or contains_injection(accreditation_details):
-        logger.warning("Prompt injection detected — escalating immediately")
-        return LLMClassificationResult(
-            source_of_funds=TextClassification.RED_FLAG,
-            source_of_funds_reason="Suspicious input detected in text field",
-            accreditation_details=TextClassification.RED_FLAG,
-            accreditation_details_reason="Suspicious input detected in text field",
-        )
-
     # Short-circuit: if both fields are None/empty, nothing to classify
     if not source_of_funds and not accreditation_details:
         return LLMClassificationResult()
