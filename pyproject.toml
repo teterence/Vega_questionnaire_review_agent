@@ -1,0 +1,17 @@
+[project]
+name = "vega-questionnaire-agent"
+version = "1.0.0"
+description = "AI agent for PE fund subscription questionnaire review"
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=1.0.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+vega-agent = "main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
