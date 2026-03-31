@@ -90,7 +90,7 @@ def analyse_text(
             response = client.chat.completions.create(
                 model=_MODEL,
                 temperature=0,
-                max_tokens=300,
+                max_completion_tokens=800,
                 response_format={"type": "json_object"},
                 messages=[
                     {"role": "system", "content": system_prompt},
